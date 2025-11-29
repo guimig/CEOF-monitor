@@ -34,11 +34,11 @@ def main():
         print(f"[info] Extraindo indicador de {rep['url']}", flush=True)
         try:
             total = extract_last_total(rep["url"])
-            if total:
+            if total and total.get("values"):
                 indicators[rep["title"]] = total
                 print(f"[info] Indicador extraido: {rep['title']} -> {total['values']}", flush=True)
             else:
-                print(f"[warn] Nenhum 'Total' encontrado em {rep['url']}", flush=True)
+                print(f"[warn] Nenhum 'Total' util encontrado em {rep['url']}", flush=True)
         except Exception as exc:
             print(f"[error] Falha ao extrair total de {rep['url']}: {exc}", flush=True)
 
