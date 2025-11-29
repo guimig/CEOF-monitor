@@ -39,7 +39,8 @@ def parse_index(base_url: str):
     if not section:
         raise RuntimeError("Sessao 'Ultimas atualizacoes' nao encontrada no indice.")
 
-    for node in section.find_all(string=lambda s: s and "data do relat" in _normalize(s)):
+    seen_urls = set()
+    for node in section.find_all(string=True):
         dt = extract_date(node)
         if not dt:
             continue
@@ -48,10 +49,15 @@ def parse_index(base_url: str):
         if not a or not a.has_attr("href"):
             continue
 
+        url = urljoin(base_url, a["href"])
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+
         reports.append(
             {
                 "title": a.get_text(strip=True),
-                "url": urljoin(base_url, a["href"]),
+                "url": url,
                 "date": dt,
             }
         )
