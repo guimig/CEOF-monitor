@@ -24,8 +24,13 @@ def parse_br_number(text: str):
 
 
 def get_soup(url: str) -> BeautifulSoup:
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
+    try:
+        # timeout: (connect, read)
+        resp = requests.get(url, timeout=(5, 20))
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Erro ao buscar URL {url}: {exc}") from None
+
     return BeautifulSoup(resp.text, "html.parser")
 
 
