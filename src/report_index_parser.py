@@ -1,18 +1,45 @@
+import unicodedata
 from urllib.parse import urljoin
 from src.utils import get_soup, extract_date
+
+
+def _normalize(text: str) -> str:
+    return (
+        "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch))
+        .lower()
+        .strip()
+    )
 
 
 def parse_index(base_url: str):
     soup = get_soup(base_url)
     reports = []
 
-    # Restringir à seção "Últimas atualizações"
-    header = soup.find(string=lambda s: s and "ultima" in s.lower() and "atualiz" in s.lower())
-    section = header.find_parent("div") if header else None
+    # Encontrar a seção "Últimas atualizações" de forma robusta (ignora acentos/maiúsculas).
+    header = None
+    for node in soup.find_all(string=True):
+        norm = _normalize(node)
+        if "ultimas" in norm and "atualizacoes" in norm:
+            header = node
+            break
+
+    section = None
+    if header:
+        for ancestor in getattr(header, "parents", []):
+            if ancestor.name in ("div", "section", "main", "body"):
+                section = ancestor
+                break
+
+    # Se não achou via heading, tenta id/class contendo "atualiz"
+    if not section:
+        section = soup.find(id=lambda x: x and "atualiz" in x.lower()) or soup.find(
+            class_=lambda x: x and "atualiz" in x.lower()
+        )
+
     if not section:
         raise RuntimeError("Sessao 'Ultimas atualizacoes' nao encontrada no indice.")
 
-    for node in section.find_all(string=lambda s: s and "data do relat" in s.lower()):
+    for node in section.find_all(string=lambda s: s and "data do relat" in _normalize(s)):
         dt = extract_date(node)
         if not dt:
             continue
@@ -29,11 +56,4 @@ def parse_index(base_url: str):
             }
         )
 
-    if not reports:
-        return reports
-
-    # Manter apenas as entradas com a data mais recente encontrada no índice.
-    latest_date = max(r["date"] for r in reports)
-    latest_only = [r for r in reports if r["date"] == latest_date]
-
-    return latest_only
+    return reports
