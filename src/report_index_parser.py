@@ -11,48 +11,62 @@ def _normalize(text: str) -> str:
     )
 
 
-def parse_index(base_url: str):
-    soup = get_soup(base_url)
-    reports = []
-
-    # Encontrar a seção "Últimas atualizações" de forma robusta (ignora acentos/maiúsculas).
-    header = None
+def _find_latest_section(soup):
+    # Procura heading com "ultimas" e "atualizacoes" ignorando acento/maiúsculas
     for node in soup.find_all(string=True):
         norm = _normalize(node)
         if "ultimas" in norm and "atualizacoes" in norm:
-            header = node
-            break
+            # sobe para um contêiner que tenha links
+            for ancestor in getattr(node, "parents", []):
+                if ancestor.name in ("div", "section", "main", "body"):
+                    if ancestor.find("a"):
+                        return ancestor
+            # fallback para próximo bloco após o heading
+            next_block = getattr(node.parent, "find_next", lambda *_: None)("div")
+            if next_block and next_block.find("a"):
+                return next_block
+            return node.parent
+    # fallback: tenta por id/class contendo "atualiz"
+    section = soup.find(id=lambda x: x and "atualiz" in x.lower()) or soup.find(
+        class_=lambda x: x and "atualiz" in x.lower()
+    )
+    return section
 
-    section = None
-    if header:
-        for ancestor in getattr(header, "parents", []):
-            if ancestor.name in ("div", "section", "main", "body"):
-                section = ancestor
-                break
 
-    # Se não achou via heading, tenta id/class contendo "atualiz"
-    if not section:
-        section = soup.find(id=lambda x: x and "atualiz" in x.lower()) or soup.find(
-            class_=lambda x: x and "atualiz" in x.lower()
-        )
+def parse_index(base_url: str):
+    soup = get_soup(base_url)
+    section = _find_latest_section(soup)
 
     if not section:
         raise RuntimeError("Sessao 'Ultimas atualizacoes' nao encontrada no indice.")
 
-    seen_urls = set()
-    for node in section.find_all(string=True):
-        dt = extract_date(node)
-        if not dt:
-            continue
+    seen = set()
+    reports = []
 
-        a = node.find_previous("a")
-        if not a or not a.has_attr("href"):
+    for a in section.find_all("a"):
+        if not a.has_attr("href"):
             continue
 
         url = urljoin(base_url, a["href"])
-        if url in seen_urls:
+        if url in seen:
             continue
-        seen_urls.add(url)
+        seen.add(url)
+
+        # Extrai data do próprio link ou do texto ao redor (li/div pai)
+        text_blob = " ".join(
+            filter(None, [a.get_text(" ", strip=True), getattr(a.parent, "get_text", lambda *args, **kwargs: "")(" ", strip=True)])
+        )
+        dt = extract_date(text_blob)
+        if not dt:
+            # tenta no irmão seguinte (ex.: <span>Data do relatório: 01/01/2024</span>)
+            sib_text = ""
+            if a.next_sibling:
+                sib_text = str(a.next_sibling)
+            dt = extract_date(sib_text)
+
+        if not dt:
+            # sem data, ignora para evitar falsos positivos
+            continue
 
         reports.append(
             {
