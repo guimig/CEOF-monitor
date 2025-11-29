@@ -1,0 +1,6 @@
+base_url: "https://guimig.github.io/EmailBackupHub/"
+max_report_age_days: 2
+
+telegram:
+  token_env: "TELEGRAM_TOKEN"
+  chat_id_env: "TELEGRAM_CHAT_ID"
