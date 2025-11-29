@@ -1,40 +1,46 @@
 import re
+import unicodedata
 from src.utils import get_soup, parse_br_number
+
+
+def _normalize(text: str) -> str:
+    return "".join(
+        ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)
+    ).lower()
+
+
+def _extract_values_from_text(text: str):
+    nums = re.findall(r"[\(\)\d\.\,]+", text)
+    values = [parse_br_number(n) for n in nums if parse_br_number(n) is not None]
+    return values
 
 
 def extract_last_total(url: str):
     soup = get_soup(url)
-    full_text = soup.get_text("\n")
 
-    # Remove trecho final com "Relatorio gerado em ..." (sem acento)
-    cutoff = full_text.find("Relatorio gerado")
-    if cutoff != -1:
-        full_text = full_text[:cutoff]
+    candidate = None
+    # Percorre linhas de tabela/div/p e pega a última linha com "total" e número.
+    for row in soup.find_all(["tr", "p", "div"]):
+        row_text = row.get_text(" ", strip=True).replace("\xa0", " ")
+        norm = _normalize(row_text)
+        if "total" not in norm:
+            continue
 
-    lines = [ln.strip() for ln in full_text.splitlines() if ln.strip()]
+        vals = _extract_values_from_text(row_text)
+        if vals:
+            candidate = {"raw": row_text, "values": vals}
 
-    # Procura linhas de total (ignora acentos/nbsp). Preferir "total final"/"total geral", senão última.
-    total_lines = []
-    preferred_lines = []
-    for ln in lines:
-        clean = ln.replace("\xa0", " ").strip()  # remove nbsp
-        low = clean.lower()
-        if low.startswith("total"):
-            total_lines.append(clean)
-            if "total final" in low or "total geral" in low:
-                preferred_lines.append(clean)
+    # Fallback: texto completo (se não achou nada nos nós principais)
+    if not candidate:
+        full_text = soup.get_text("\n").replace("\xa0", " ")
+        cutoff = _normalize(full_text).find("relatorio gerado")
+        if cutoff != -1:
+            full_text = full_text[:cutoff]
+        for ln in [ln.strip() for ln in full_text.splitlines() if ln.strip()]:
+            if "total" not in _normalize(ln):
+                continue
+            vals = _extract_values_from_text(ln)
+            if vals:
+                candidate = {"raw": ln, "values": vals}
 
-    if not total_lines:
-        return None
-
-    line = preferred_lines[-1] if preferred_lines else total_lines[-1]
-    nums = re.findall(r"[\(\)\d\.\,]+", line)
-    values = [parse_br_number(n) for n in nums if parse_br_number(n) is not None]
-
-    if not values:
-        return None
-
-    return {
-        "raw": line,
-        "values": values,
-    }
+    return candidate
