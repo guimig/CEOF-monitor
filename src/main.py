@@ -35,7 +35,9 @@ def main():
         try:
             total = extract_last_total(rep["url"])
             if total and total.get("values"):
-                indicators[rep["title"]] = total
+                title_key = rep["title"]
+                # Se já existir indicador com o mesmo título, mantenha o mais recente (último percorrido).
+                indicators[title_key] = total
                 print(f"[info] Indicador extraido: {rep['title']} -> {total['values']}", flush=True)
             else:
                 print(f"[warn] Nenhum 'Total' util encontrado em {rep['url']}", flush=True)

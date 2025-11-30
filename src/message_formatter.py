@@ -26,13 +26,20 @@ def format_message(reports, stale, indicators, base_url):
     else:
         for title, info in indicators.items():
             title = _clean_title(title)
-            vals = ", ".join(
-                f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                for v in info["values"]
-            )
-            lines.append(f"   - {title}")
-            lines.append(f"     Linha: {info['raw']}")
-            lines.append(f"     Valores: {vals}")
+            if info.get("values") and isinstance(info["values"], list) and isinstance(info["values"][0], dict):
+                lines.append(f"   - {title}")
+                for item in info["values"]:
+                    v = item["value"]
+                    label = item["col"]
+                    val_fmt = f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    lines.append(f"     • {label}: {val_fmt}")
+            else:
+                vals = ", ".join(
+                    f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    for v in info.get("values", [])
+                )
+                lines.append(f"   - {title}")
+                lines.append(f"     Total final: {vals}")
             lines.append("")  # separador visual
 
     return "\n".join(lines)
