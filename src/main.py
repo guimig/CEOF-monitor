@@ -188,6 +188,34 @@ def main():
     # Médias 30d
     summary["gru_media_30d"] = moving_avg("gru_arrecadado", days=30)
 
+    # Tendências e maiores variações (último dia vs. anterior / médias)
+    trends = []
+    movers = []
+    keys_trend = [
+        ("a_liquidar", "A liquidar"),
+        ("liquidados_a_pagar", "Liquidados a pagar"),
+        ("pagos", "Pagos"),
+        ("rap_a_pagar", "RAP a pagar"),
+        ("rap_pagos", "RAP pagos"),
+        ("gru_arrecadado", "GRU arrecadado"),
+    ]
+    for key, label in keys_trend:
+        cur = record.get(key)
+        prev = last_value(key)
+        avg7 = moving_avg(key, days=7)
+        if cur is None or prev is None or avg7 is None:
+            continue
+        delta_pct = (cur - prev) / prev if prev else None
+        trend_line = f"{label}: {delta_pct*100:+.1f}% vs. dia anterior; {((cur-avg7)/avg7*100):+.1f}% vs. média 7d"
+        trends.append(trend_line)
+        movers.append((abs(cur - prev), f"{label}: {cur - prev:+,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")))
+
+    trends = trends[:6]
+    movers = sorted(movers, key=lambda x: x[0], reverse=True)[:3]
+
+    summary["trends"] = trends
+    summary["movers"] = [m[1] for m in movers]
+
     # Mensagem final
     weekday = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"][today.weekday()]
     today_str = today.strftime("%d/%m/%Y")

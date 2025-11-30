@@ -115,4 +115,20 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
     else:
         lines.append("  • Nenhum indicador principal encontrado.")
 
+    # Tendências
+    if summary.get("trends"):
+        lines.append("")
+        lines.append("📊 Tendências (dia vs. anterior / vs. média 7d)")
+        lines.append("────────────────────────")
+        for tr in summary["trends"]:
+            lines.append(f"  • {tr}")
+
+    # Maiores variações do dia
+    if summary.get("movers"):
+        lines.append("")
+        lines.append("🚩 Maiores variações do dia")
+        lines.append("────────────────────────")
+        for mv in summary["movers"]:
+            lines.append(f"  • {mv}")
+
     return "\n".join(lines)
