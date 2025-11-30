@@ -9,7 +9,8 @@ from src.report_total_extractor import extract_last_total
 from src.extra_parsers import (
     creditos_por_grupo,
     provisionamentos_por_grupo,
-    top5_por_coluna,
+    top5_empenhos_a_liquidar,
+    top5_rap_a_pagar,
 )
 from src.message_formatter import format_message
 from src.telegram_client import send_telegram
@@ -161,21 +162,43 @@ def main():
         except Exception as exc:
             print(f"[warn] Falha ao calcular provisionamentos: {exc}")
 
-    # Totais de empenhado/liquidado/pago (mensal) para percentuais
-    emp_vals = indicators.get("Despesas Empenhadas, Liquidadas e Pagas - Mês Lançamento")
-    if emp_vals and emp_vals.get("values"):
-        vals = [v.get("value") for v in emp_vals["values"] if isinstance(v, dict)]
-        if len(vals) >= 3:
-            summary["empenhado_total"] = vals[0]
-            summary["liquidado_total"] = vals[1]
-            summary["pago_total"] = vals[2]
-            if summary.get("prov_total"):
-                summary["pct_empenhado_prov"] = summary["empenhado_total"] / summary["prov_total"] if summary["prov_total"] else None
-            if summary.get("empenhado_total"):
-                summary["pct_liquidado_empenhado"] = summary["liquidado_total"] / summary["empenhado_total"] if summary["empenhado_total"] else None
-            if summary.get("liquidado_total"):
-                summary["pct_pago_liquidado"] = summary["pago_total"] / summary["liquidado_total"] if summary["liquidado_total"] else None
+    # Provisionado total direto do indicador (se existir)
+    prov_total_ind = _pick_value(
+        indicators,
+        lambda t: "provisionamentos" in t,
+        lambda c: "saldo" in c,
+    )
+    if prov_total_ind is not None:
+        summary["prov_total"] = prov_total_ind
 
+    # Totais de empenhado/liquidado/pago (mensal) para percentuais
+    summary["empenhado_total"] = _pick_value(
+        indicators,
+        lambda t: "despesas empenhadas, liquidadas e pagas - m" in t,
+        lambda c: "empenhadas" in c,
+    )
+    summary["liquidado_total"] = _pick_value(
+        indicators,
+        lambda t: "despesas empenhadas, liquidadas e pagas - m" in t,
+        lambda c: "liquidadas" in c,
+    )
+    summary["pago_total"] = _pick_value(
+        indicators,
+        lambda t: "despesas empenhadas, liquidadas e pagas - m" in t,
+        lambda c: "pagas" in c,
+    )
+    if summary.get("prov_total") is not None and summary.get("empenhado_total") is not None:
+        summary["pct_empenhado_prov"] = (
+            summary["empenhado_total"] / summary["prov_total"] if summary["prov_total"] else None
+        )
+    if summary.get("empenhado_total") is not None and summary.get("liquidado_total") is not None:
+        summary["pct_liquidado_empenhado"] = (
+            summary["liquidado_total"] / summary["empenhado_total"] if summary["empenhado_total"] else None
+        )
+    if summary.get("liquidado_total") is not None and summary.get("pago_total") is not None:
+        summary["pct_pago_liquidado"] = (
+            summary["pago_total"] / summary["liquidado_total"] if summary["liquidado_total"] else None
+        )
     # Carregar histórico
     history_path = Path(".cache/history.json")
     history_path.parent.mkdir(parents=True, exist_ok=True)
