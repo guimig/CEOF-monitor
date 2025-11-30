@@ -47,7 +47,8 @@ def main():
     # Verificar desatualizados
     stale = []
     tz = ZoneInfo("America/Sao_Paulo")
-    today = datetime.now(tz).date()
+    now = datetime.now(tz)
+    today = now.date()
     for rep in reports:
         age = (today - rep["date"]).days
         if age > max_age:
@@ -125,7 +126,8 @@ def main():
     # Mensagem final
     weekday = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"][today.weekday()]
     today_str = today.strftime("%d/%m/%Y")
-    msg = format_message(reports, stale, summary, base_url, today_str, weekday)
+    time_str = now.strftime("%H:%M")
+    msg = format_message(reports, stale, summary, base_url, today_str, time_str, weekday)
     print(f"[info] Enviando mensagem para Telegram ({len(msg)} chars)", flush=True)
     resp = send_telegram(cfg["telegram"]["token"], cfg["telegram"]["chat_id"], msg)
     print(f"[info] Telegram enviado com sucesso: status={resp.status_code} body={resp.text}", flush=True)
