@@ -130,22 +130,36 @@ def main():
         if base_rap:
             summary["pct_rap_pago"] = summary["rap_pagos"] / base_rap
 
+    # Descobrir URLs específicos a partir dos relatórios
+    def find_url(title_substr):
+        for r in reports:
+            if title_substr.lower() in _norm(r["title"]):
+                return r["url"]
+        return None
+
+    cred_url = find_url("crédito disponível")
+    prov_url = find_url("provisionamentos")
+    saldos_url = find_url("saldos de empenhos do exercício - conta contábil")
+    rap_url = find_url("restos a pagar (rap)")
+
     # Créditos disponíveis por grupo (investimentos vs ODC)
-    try:
-        cred_groups = creditos_por_grupo(f"{base_url}credito-disponivel-mes-lançamento.html")
-        summary["credito_invest"] = cred_groups["investimentos"]
-        summary["credito_odc"] = cred_groups["odc"]
-    except Exception as exc:
-        print(f"[warn] Falha ao calcular credito por grupo: {exc}")
+    if cred_url:
+        try:
+            cred_groups = creditos_por_grupo(cred_url)
+            summary["credito_invest"] = cred_groups["investimentos"]
+            summary["credito_odc"] = cred_groups["odc"]
+        except Exception as exc:
+            print(f"[warn] Falha ao calcular credito por grupo: {exc}")
 
     # Provisionamentos por grupo (investimentos vs ODC)
-    try:
-        prov = provisionamentos_por_grupo(f"{base_url}provisionamentos.html")
-        summary["prov_invest"] = prov["investimentos"]
-        summary["prov_odc"] = prov["odc"]
-        summary["prov_total"] = prov["total"]
-    except Exception as exc:
-        print(f"[warn] Falha ao calcular provisionamentos: {exc}")
+    if prov_url:
+        try:
+            prov = provisionamentos_por_grupo(prov_url)
+            summary["prov_invest"] = prov["investimentos"]
+            summary["prov_odc"] = prov["odc"]
+            summary["prov_total"] = prov["total"]
+        except Exception as exc:
+            print(f"[warn] Falha ao calcular provisionamentos: {exc}")
 
     # Totais de empenhado/liquidado/pago (mensal) para percentuais
     emp_vals = indicators.get("Despesas Empenhadas, Liquidadas e Pagas - Mês Lançamento")
@@ -254,18 +268,16 @@ def main():
     summary["movers"] = [m[1] for m in movers]
 
     # Top 5 maiores empenhos a liquidar (exercício) e RAP a pagar
-    try:
-        summary["top5_a_liquidar"] = top5_por_coluna(
-            f"{base_url}saldos-de-empenhos-do-exercicio-conta-contabil.html", "a liquidar"
-        )
-    except Exception as exc:
-        print(f"[warn] Falha ao calcular top5 a liquidar: {exc}")
-    try:
-        summary["top5_rap_a_pagar"] = top5_por_coluna(
-            f"{base_url}restos-a-pagar-rap.html", "a pagar"
-        )
-    except Exception as exc:
-        print(f"[warn] Falha ao calcular top5 rap a pagar: {exc}")
+    if saldos_url:
+        try:
+            summary["top5_a_liquidar"] = top5_por_coluna(saldos_url, "a liquidar")
+        except Exception as exc:
+            print(f"[warn] Falha ao calcular top5 a liquidar: {exc}")
+    if rap_url:
+        try:
+            summary["top5_rap_a_pagar"] = top5_por_coluna(rap_url, "a pagar")
+        except Exception as exc:
+            print(f"[warn] Falha ao calcular top5 rap a pagar: {exc}")
 
     # Mensagem final
     weekday = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"][today.weekday()]

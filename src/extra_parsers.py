@@ -19,10 +19,10 @@ def creditos_por_grupo(url):
         if not cells:
             continue
         label0 = cells[0].upper()
-        if "TOTAL" in label0:
+        if "TOTAL" in label0 or "GRUPO DESPESA" in label0:
             continue
+        # último número da linha (Saldo)
         val = None
-        # usa o último número da linha (Saldo - R$)
         for cell in reversed(cells):
             v = parse_br_number(cell)
             if v is not None:
@@ -66,40 +66,49 @@ def provisionamentos_por_grupo(url):
 def top5_por_coluna(url, col_keyword):
     rows = _parse_rows(url)
     items = []
+    # tenta encontrar índice da coluna que contém o keyword
+    col_idx = None
+    for row in rows:
+        for idx, cell in enumerate(row):
+            if col_keyword in cell.lower():
+                col_idx = idx
+                break
+        if col_idx is not None:
+            break
+
     for cells in rows:
         label_row = " ".join(cells).lower()
         if "total" in label_row:
             continue
+
         val = None
-        for idx, cell in enumerate(cells):
-            if col_keyword in cell.lower():
-                # procurar número nessa célula ou à direita
-                v = parse_br_number(cell)
-                if v is None and idx + 1 < len(cells):
-                    v = parse_br_number(cells[idx + 1])
-                if v is not None:
-                    val = v
-                    break
+        if col_idx is not None and col_idx < len(cells):
+            val = parse_br_number(cells[col_idx])
+        if val is None:
+            for cell in cells:
+                if col_keyword in cell.lower():
+                    val = parse_br_number(cell)
+                    if val is not None:
+                        break
         if val is None:
             continue
 
         memo = ""
         nd = ""
-        # heurística: ND costuma estar na coluna seguinte ao grupo/natureza
         for cell in cells:
             if "ne" in cell.lower():
-                memo = cell[-20:] if len(cell) > 20 else cell
-            if any(ch.isdigit() for ch in cell) and " " not in cell and len(cell) in (8, 9):
+                memo = cell
+            if cell.isdigit() and len(cell) in (8, 9):
                 nd = cell
-        if not nd and len(cells) > 2:
+        if not nd and len(cells) > 1:
             nd = cells[1]
 
-        items.append((val, nd, memo))
+        memo_short = memo[-12:] if memo else ""
+        items.append((val, nd, memo_short))
 
     items = sorted(items, key=lambda x: x[0], reverse=True)
     top = items[:5]
     formatted = []
     for val, nd, memo in top:
-        memo_short = memo[-12:] if memo else ""
-        formatted.append(f"{nd}: {memo_short} -> R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        formatted.append(f"{nd}: {memo} -> R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     return formatted
