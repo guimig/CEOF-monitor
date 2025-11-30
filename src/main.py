@@ -5,6 +5,23 @@ from src.report_total_extractor import extract_last_total
 from src.message_formatter import format_message
 from src.telegram_client import send_telegram
 
+
+def _pick_value(indicators, title_pred, col_pred):
+    for title, info in indicators.items():
+        if not title_pred(title):
+            continue
+        vals = info.get("values") or []
+        for item in reversed(vals):
+            if isinstance(item, dict):
+                col = item.get("col", "")
+                if col_pred(col):
+                    return item.get("value")
+            else:
+                if col_pred(""):
+                    return item
+    return None
+
+
 def main():
     cfg = load_settings()
 
@@ -36,7 +53,6 @@ def main():
             total = extract_last_total(rep["url"])
             if total and total.get("values"):
                 title_key = rep["title"]
-                # Se já existir indicador com o mesmo título, mantenha o mais recente (último percorrido).
                 indicators[title_key] = total
                 print(f"[info] Indicador extraido: {rep['title']} -> {total['values']}", flush=True)
             else:
@@ -44,8 +60,62 @@ def main():
         except Exception as exc:
             print(f"[error] Falha ao extrair total de {rep['url']}: {exc}", flush=True)
 
+    # Resumo dos principais indicadores
+    summary = {
+        "credito_disponivel": _pick_value(
+            indicators,
+            lambda t: "crédito disponível" in t.lower(),
+            lambda c: True,
+        ),
+        "empenhado": _pick_value(
+            indicators,
+            lambda t: "saldos de empenhos do exercício" in t.lower(),
+            lambda c: "empenhad" in c.lower(),
+        )
+        or _pick_value(
+            indicators,
+            lambda t: "despesas empenhadas, liquidadas e pagas" in t.lower(),
+            lambda c: "empenhad" in c.lower(),
+        ),
+        "liquidado": _pick_value(
+            indicators,
+            lambda t: "saldos de empenhos do exercício" in t.lower(),
+            lambda c: "liquidad" in c.lower(),
+        )
+        or _pick_value(
+            indicators,
+            lambda t: "despesas empenhadas, liquidadas e pagas" in t.lower(),
+            lambda c: "liquidad" in c.lower(),
+        ),
+        "pago": _pick_value(
+            indicators,
+            lambda t: "saldos de empenhos do exercício" in t.lower(),
+            lambda c: "pago" in c.lower(),
+        )
+        or _pick_value(
+            indicators,
+            lambda t: "despesas empenhadas, liquidadas e pagas" in t.lower(),
+            lambda c: "pago" in c.lower(),
+        ),
+        "rap_pagos": _pick_value(
+            indicators,
+            lambda t: "restos a pagar" in t.lower(),
+            lambda c: "pagos" in c.lower(),
+        ),
+        "rap_a_pagar": _pick_value(
+            indicators,
+            lambda t: "restos a pagar" in t.lower(),
+            lambda c: "a pagar" in c.lower(),
+        ),
+        "gru_arrecadado": _pick_value(
+            indicators,
+            lambda t: "recolhimento" in t.lower() and "gru" in t.lower(),
+            lambda c: "arrecad" in c.lower(),
+        ),
+    }
+
     # Mensagem final
-    msg = format_message(reports, stale, indicators, base_url)
+    msg = format_message(reports, stale, summary, base_url)
     print(f"[info] Enviando mensagem para Telegram ({len(msg)} chars)", flush=True)
     resp = send_telegram(cfg["telegram"]["token"], cfg["telegram"]["chat_id"], msg)
     print(f"[info] Telegram enviado com sucesso: status={resp.status_code} body={resp.text}", flush=True)

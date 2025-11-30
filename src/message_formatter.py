@@ -4,8 +4,12 @@ def _clean_title(title: str) -> str:
     return parts[0].strip() if parts else title.strip()
 
 
-def format_message(reports, stale, indicators, base_url):
-    # Texto com acentos e pequenos ícones para legibilidade; sem Markdown.
+def _fmt_currency(val: float) -> str:
+    return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def format_message(reports, stale, summary, base_url):
+    # Texto curto com acentos e ícones; sem Markdown.
     lines = []
     lines.append("📊 CEOF - Monitoramento Automático")
     lines.append(f"🌐 Base: {base_url}")
@@ -20,26 +24,27 @@ def format_message(reports, stale, indicators, base_url):
             lines.append(f"   - {title} ({r['date']}, {r['age']} dias)")
     lines.append("")
 
-    lines.append("📈 Indicadores extraídos (linha de total)")
-    if not indicators:
-        lines.append("   - Nenhum 'Total' encontrado nos relatórios analisados.")
+    lines.append("📈 Principais indicadores")
+    if summary:
+        if summary.get("credito_disponivel") is not None:
+            lines.append(f"   - Crédito disponível: {_fmt_currency(summary['credito_disponivel'])}")
+        if summary.get("empenhado") is not None or summary.get("liquidado") is not None or summary.get("pago") is not None:
+            lines.append("   - Saldos de empenhos:")
+            if summary.get("empenhado") is not None:
+                lines.append(f"       • Empenhado: {_fmt_currency(summary['empenhado'])}")
+            if summary.get("liquidado") is not None:
+                lines.append(f"       • Liquidado: {_fmt_currency(summary['liquidado'])}")
+            if summary.get("pago") is not None:
+                lines.append(f"       • Pago: {_fmt_currency(summary['pago'])}")
+        if summary.get("rap_pagos") is not None or summary.get("rap_a_pagar") is not None:
+            lines.append("   - Restos a pagar:")
+            if summary.get("rap_pagos") is not None:
+                lines.append(f"       • Pagos: {_fmt_currency(summary['rap_pagos'])}")
+            if summary.get("rap_a_pagar") is not None:
+                lines.append(f"       • A pagar: {_fmt_currency(summary['rap_a_pagar'])}")
+        if summary.get("gru_arrecadado") is not None:
+            lines.append(f"   - GRU arrecadado: {_fmt_currency(summary['gru_arrecadado'])}")
     else:
-        for title, info in indicators.items():
-            title = _clean_title(title)
-            if info.get("values") and isinstance(info["values"], list) and isinstance(info["values"][0], dict):
-                lines.append(f"   - {title}")
-                for item in info["values"]:
-                    v = item["value"]
-                    label = item["col"]
-                    val_fmt = f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    lines.append(f"     • {label}: {val_fmt}")
-            else:
-                vals = ", ".join(
-                    f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    for v in info.get("values", [])
-                )
-                lines.append(f"   - {title}")
-                lines.append(f"     Total final: {vals}")
-            lines.append("")  # separador visual
+        lines.append("   - Nenhum indicador principal encontrado.")
 
     return "\n".join(lines)
