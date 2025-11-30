@@ -51,6 +51,16 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
                 f"  • Crédito disponível: {_fmt_currency(summary['credito_disponivel'])}"
                 f"{_fmt_delta(delta)}{_fmt_pct(pct)}"
             )
+            if summary.get("credito_invest") is not None or summary.get("credito_odc") is not None:
+                inv = summary.get("credito_invest")
+                odc = summary.get("credito_odc")
+                parts = []
+                if inv is not None:
+                    parts.append(f"Invest: {_fmt_currency(inv)}")
+                if odc is not None:
+                    parts.append(f"ODC: {_fmt_currency(odc)}")
+                if parts:
+                    lines.append("      - " + "; ".join(parts))
 
         if (
             summary.get("a_liquidar") is not None
@@ -112,6 +122,16 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
             else:
                 linha_gru += " (sem histórico 30d)"
             lines.append(linha_gru)
+
+        # Percentuais adicionais
+        if summary.get("pct_empenhado_prov") is not None or summary.get("pct_liquidado_empenhado") is not None or summary.get("pct_pago_liquidado") is not None:
+            lines.append("  • Coberturas")
+            if summary.get("pct_empenhado_prov") is not None:
+                lines.append(f"      - Empenhado / Provisionado: {summary['pct_empenhado_prov']*100:.1f}%")
+            if summary.get("pct_liquidado_empenhado") is not None:
+                lines.append(f"      - Liquidado / Empenhado: {summary['pct_liquidado_empenhado']*100:.1f}%")
+            if summary.get("pct_pago_liquidado") is not None:
+                lines.append(f"      - Pago / Liquidado: {summary['pct_pago_liquidado']*100:.1f}%")
     else:
         lines.append("  • Nenhum indicador principal encontrado.")
 
@@ -130,5 +150,19 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
         lines.append("────────────────────────")
         for mv in summary["movers"]:
             lines.append(f"  • {mv}")
+
+    # Top 5 listas
+    if summary.get("top5_a_liquidar") or summary.get("top5_rap_a_pagar"):
+        lines.append("")
+        lines.append("📌 Maiores saldos a liquidar")
+        lines.append("────────────────────────")
+        if summary.get("top5_a_liquidar"):
+            lines.append("  • Exercício atual:")
+            for item in summary["top5_a_liquidar"]:
+                lines.append(f"      - {item}")
+        if summary.get("top5_rap_a_pagar"):
+            lines.append("  • Restos a pagar:")
+            for item in summary["top5_rap_a_pagar"]:
+                lines.append(f"      - {item}")
 
     return "\n".join(lines)

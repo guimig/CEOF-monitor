@@ -6,6 +6,11 @@ import unicodedata
 from src.config_loader import load_settings
 from src.report_index_parser import parse_index
 from src.report_total_extractor import extract_last_total
+from src.extra_parsers import (
+    creditos_por_grupo,
+    provisionamentos_por_grupo,
+    top5_por_coluna,
+)
 from src.message_formatter import format_message
 from src.telegram_client import send_telegram
 
@@ -125,6 +130,38 @@ def main():
         if base_rap:
             summary["pct_rap_pago"] = summary["rap_pagos"] / base_rap
 
+    # Créditos disponíveis por grupo (investimentos vs ODC)
+    try:
+        cred_groups = creditos_por_grupo(f"{base_url}credito-disponivel-mes-lançamento.html")
+        summary["credito_invest"] = cred_groups["investimentos"]
+        summary["credito_odc"] = cred_groups["odc"]
+    except Exception as exc:
+        print(f"[warn] Falha ao calcular credito por grupo: {exc}")
+
+    # Provisionamentos por grupo (investimentos vs ODC)
+    try:
+        prov = provisionamentos_por_grupo(f"{base_url}provisionamentos.html")
+        summary["prov_invest"] = prov["investimentos"]
+        summary["prov_odc"] = prov["odc"]
+        summary["prov_total"] = prov["total"]
+    except Exception as exc:
+        print(f"[warn] Falha ao calcular provisionamentos: {exc}")
+
+    # Totais de empenhado/liquidado/pago (mensal) para percentuais
+    emp_vals = indicators.get("Despesas Empenhadas, Liquidadas e Pagas - Mês Lançamento")
+    if emp_vals and emp_vals.get("values"):
+        vals = [v.get("value") for v in emp_vals["values"] if isinstance(v, dict)]
+        if len(vals) >= 3:
+            summary["empenhado_total"] = vals[0]
+            summary["liquidado_total"] = vals[1]
+            summary["pago_total"] = vals[2]
+            if summary.get("prov_total"):
+                summary["pct_empenhado_prov"] = summary["empenhado_total"] / summary["prov_total"] if summary["prov_total"] else None
+            if summary.get("empenhado_total"):
+                summary["pct_liquidado_empenhado"] = summary["liquidado_total"] / summary["empenhado_total"] if summary["empenhado_total"] else None
+            if summary.get("liquidado_total"):
+                summary["pct_pago_liquidado"] = summary["pago_total"] / summary["liquidado_total"] if summary["liquidado_total"] else None
+
     # Carregar histórico
     history_path = Path(".cache/history.json")
     history_path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,6 +252,20 @@ def main():
 
     summary["trends"] = trends
     summary["movers"] = [m[1] for m in movers]
+
+    # Top 5 maiores empenhos a liquidar (exercício) e RAP a pagar
+    try:
+        summary["top5_a_liquidar"] = top5_por_coluna(
+            f"{base_url}saldos-de-empenhos-do-exercicio-conta-contabil.html", "a liquidar"
+        )
+    except Exception as exc:
+        print(f"[warn] Falha ao calcular top5 a liquidar: {exc}")
+    try:
+        summary["top5_rap_a_pagar"] = top5_por_coluna(
+            f"{base_url}restos-a-pagar-rap.html", "a pagar"
+        )
+    except Exception as exc:
+        print(f"[warn] Falha ao calcular top5 rap a pagar: {exc}")
 
     # Mensagem final
     weekday = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"][today.weekday()]
