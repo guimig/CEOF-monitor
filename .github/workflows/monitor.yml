@@ -2,7 +2,7 @@ name: Monitorar Relatórios CEOF
 
 on:
   schedule:
-    - cron: "0 9 * * *"    # todo dia às 06h BRT (09h UTC)
+    - cron: "30 11 * * *"    # todo dia às 08h30 BRT (11h30 UTC)
   workflow_dispatch:
 
 jobs:
