@@ -12,7 +12,7 @@ def format_message(reports, stale, summary, base_url, today_str, weekday):
     lines = []
     lines.append("📊 CEOF - Monitoramento Automático")
     lines.append(f"🌐 Base: {base_url}")
-    lines.append("────────────────────────────")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
 
     # Status de atualização
     if stale:
@@ -21,10 +21,7 @@ def format_message(reports, stale, summary, base_url, today_str, weekday):
             title = _clean_title(r["title"])
             lines.append(f"  - {title}: {r['date']} ({r['age']} dias)")
     else:
-        lines.append(f"✅ Relatórios atualizados (fechamento do dia anterior))
-    lines.append("")
-
-    lines.append("Hoje é " + today_str + f" ({weekday})")
+        lines.append(f"✅ Relatórios atualizados (fechamento do dia anterior) - {today_str} ({weekday})")
     lines.append("")
 
     # Indicadores principais
