@@ -15,14 +15,16 @@ def format_message(reports, stale, summary, base_url):
     lines.append(f"🌐 Base: {base_url}")
     lines.append("")
 
-    lines.append("⚠️  Relatórios desatualizados (>2 dias)")
-    if not stale:
-        lines.append("   - Nenhum; todos atualizados.")
-    else:
+    # Desatualizados ou status de atualização recente
+    if stale:
+        lines.append("⚠️  Relatórios desatualizados (>2 dias)")
         for r in stale:
             title = _clean_title(r["title"])
             lines.append(f"   - {title} ({r['date']}, {r['age']} dias)")
-    lines.append("")
+        lines.append("")
+    else:
+        lines.append("✅ Relatórios atualizados recentemente.")
+        lines.append("")
 
     lines.append("📈 Principais indicadores")
     if summary:
