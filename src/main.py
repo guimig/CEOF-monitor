@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import unicodedata
 from src.config_loader import load_settings
 from src.report_index_parser import parse_index
@@ -45,7 +46,8 @@ def main():
 
     # Verificar desatualizados
     stale = []
-    today = date.today()
+    tz = ZoneInfo("America/Sao_Paulo")
+    today = datetime.now(tz).date()
     for rep in reports:
         age = (today - rep["date"]).days
         if age > max_age:

@@ -10,23 +10,26 @@ def _fmt_currency(val: float) -> str:
 
 def format_message(reports, stale, summary, base_url, today_str, weekday):
     lines = []
-    lines.append("CEOF - Monitoramento Automático")
-    lines.append(f"Base: {base_url}")
-    lines.append("------------------------------")
+    lines.append("📊 CEOF - Monitoramento Automático")
+    lines.append(f"🌐 Base: {base_url}")
+    lines.append("────────────────────────────")
 
     # Status de atualização
     if stale:
-        lines.append("! Relatórios desatualizados (>1 dia)")
+        lines.append("⚠️  Relatórios desatualizados (>1 dia)")
         for r in stale:
             title = _clean_title(r["title"])
             lines.append(f"  - {title}: {r['date']} ({r['age']} dias)")
     else:
-        lines.append(f"✔ Relatórios atualizados - {today_str} ({weekday})")
+        lines.append(f"✅ Relatórios atualizados (fechamento do dia anterior))
+    lines.append("")
+
+    lines.append("Hoje é " + today_str + f" ({weekday})")
     lines.append("")
 
     # Indicadores principais
-    lines.append("Principais indicadores")
-    lines.append("----------------------")
+    lines.append("📈 Principais indicadores")
+    lines.append("────────────────────────")
 
     if summary and any(v is not None for v in summary.values()):
         if summary.get("credito_disponivel") is not None:
