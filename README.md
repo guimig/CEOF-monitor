@@ -1,81 +1,48 @@
-# CEOF – Monitoramento Automático (GitHub + Telegram)
+# CEOF – Monitoramento Automático (GitHub Actions + Telegram)
 
-Este projeto monitora automaticamente os relatórios do portal:
+Este repositório roda um monitor diário dos relatórios publicados em  
+https://guimig.github.io/EmailBackupHub/ e envia um resumo para o Telegram.
 
-**https://guimig.github.io/EmailBackupHub/**
+Principais funções:
+- Verifica a data dos relatórios (stale > 1 dia, exceto o relatório anual 2024).
+- Extrai a linha de **Total** dos relatórios mais recentes.
+- Calcula indicadores-chave (crédito disponível, saldos de empenhos, RAP, GRU, coberturas).
+- Histórico em cache para variações e médias.
+- Envia mensagem formatada (com ícones/separadores) para o Telegram.
+- Divide a mensagem se ultrapassar o limite de caracteres do Telegram.
 
-Ele verifica:
+## Configuração rápida
 
-- Datas dos relatórios
-- Relatórios desatualizados (>2 dias)
-- Última linha “Total” de cada relatório
-- Extrai valores numéricos
-- Envia alertas para o Telegram
+1) **Bot e chat no Telegram**  
+   - Crie um bot com o **@BotFather** (`/newbot`) e guarde o token.  
+   - Descubra o `chat_id` chamando `https://api.telegram.org/bot<SEU_TOKEN>/getUpdates`
+     ou usando bots de utilitário como @userinfobot.
 
-Tudo é executado automaticamente via **GitHub Actions**.
+2) **Secrets no GitHub**  
+   Em *Settings > Secrets > Actions*, crie:
+   - `TELEGRAM_TOKEN`
+   - `TELEGRAM_CHAT_ID`
 
----
+3) **Configurações gerais**  
+   - Arquivo: `config/settings.yaml` (base_url, max_report_age_days, etc.).  
+   - Workflow: `.github/workflows/monitor.yml` (agenda diária, cache do histórico em `.cache/history.json`).
 
-## 🚀 Como usar
+4) **Rodar local (opcional)**  
+   ```bash
+   pip install -r requirements.txt
+   TELEGRAM_TOKEN=xxx TELEGRAM_CHAT_ID=yyy python -m src.main
+   ```
 
-### 1. Crie o bot no Telegram
+## O que a mensagem mostra
 
-1. Abra o Telegram → procure por **@BotFather**
-2. `/newbot`
-3. Receba seu token, algo como:
+- Status de atualização dos relatórios (com data/hora em America/Sao_Paulo).
+- Indicadores principais: crédito disponível (invest x ODC), saldos de empenhos
+  (a liquidar, liquidados a pagar, pagos), RAP (pagos e a pagar), GRU.
+- Coberturas: empenhado/provisionado, liquidado/empenhado, pago/liquidado.
+- Variações diárias e contra média 7d (quando há histórico).
+- Se a mensagem ficar longa, ela é enviada em partes (<3800 caracteres cada).
 
-123456789:AA...XYZ
-
-4. Pegue seu `chat_id` abrindo no navegador:
-
-https://api.telegram.org/botSEU_TOKEN/getUpdates
-
----
-
-### 2. Adicione Secrets no GitHub
-
-No repositório:
-
-Settings → Secrets → Actions → New secret
-
-Crie:
-
-- `TELEGRAM_TOKEN`
-- `TELEGRAM_CHAT_ID`
-
----
-
-### 3. Estrutura do projeto
-
-Clone este repositório e mantenha a estrutura:
-
-src/ config/ .github/workflows/ requirements.txt
-
----
-
-### 4. Comportamento automático
-
-O GitHub executará o script:
-
-- Todos os dias às 10h UTC
-- Ou manualmente via "Run workflow"
-
-Você receberá um relatório assim:
-
-- ❗ Relatórios desatualizados  
-- 📌 Totais por relatório  
-- 📊 Valores extraídos  
-
----
-
-### 5. Executar manualmente (opcional)
-
-pip install -r requirements.txt python -m src.main
-
----
-
-## 🧠 Observações
-
-- O sistema é modularizado para fácil manutenção.
-- O código segue boas práticas (responsabilidades separadas).
-- Fácil expandir para novas métricas ou gráficos.
+## Observações
+- Histórico é persistido em `.cache/history.json` (cacheado no workflow).
+- Relatórios do exercício 2024 não entram no alerta de desatualização.
+- Sem dependências além de `requests`, `beautifulsoup4`, `pyyaml`.
