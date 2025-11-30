@@ -8,6 +8,20 @@ def _fmt_currency(val: float) -> str:
     return f"R$ {val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _fmt_delta(delta: float) -> str:
+    if delta is None:
+        return ""
+    sign = "+" if delta >= 0 else ""
+    return f" ({sign}{delta:,.2f})".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _fmt_pct(pct: float) -> str:
+    if pct is None:
+        return ""
+    sign = "+" if pct >= 0 else ""
+    return f" ({sign}{pct*100:.1f}%)"
+
+
 def format_message(reports, stale, summary, base_url, today_str, time_str, weekday):
     lines = []
     lines.append("📊 CEOF - Monitoramento Automático")
@@ -22,7 +36,7 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
             title = _clean_title(r["title"])
             lines.append(f"  - {title}: {r['date']} ({r['age']} dias)")
     else:
-        lines.append(f"✅ Relatórios atualizados (fechamento do dia anterior)")
+        lines.append("✅ Relatórios atualizados (fechamento do dia anterior)")
     lines.append("")
 
     # Indicadores principais
@@ -31,7 +45,12 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
 
     if summary and any(v is not None for v in summary.values()):
         if summary.get("credito_disponivel") is not None:
-            lines.append(f"  • Crédito disponível: {_fmt_currency(summary['credito_disponivel'])}")
+            delta = summary.get("credito_disponivel_delta")
+            pct = summary.get("credito_disponivel_pct")
+            lines.append(
+                f"  • Crédito disponível: {_fmt_currency(summary['credito_disponivel'])}"
+                f"{_fmt_delta(delta)}{_fmt_pct(pct)}"
+            )
 
         if (
             summary.get("a_liquidar") is not None
@@ -40,25 +59,59 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
         ):
             lines.append("  • Saldos de empenhos")
             if summary.get("a_liquidar") is not None:
-                lines.append(f"      - A liquidar: {_fmt_currency(summary['a_liquidar'])}")
+                lines.append(
+                    f"      - A liquidar: {_fmt_currency(summary['a_liquidar'])}"
+                    f"{_fmt_delta(summary.get('a_liquidar_delta'))}"
+                    f"{_fmt_pct(summary.get('a_liquidar_pct'))}"
+                )
             if summary.get("liquidados_a_pagar") is not None:
-                lines.append(f"      - Liquidados a pagar: {_fmt_currency(summary['liquidados_a_pagar'])}")
+                lines.append(
+                    f"      - Liquidados a pagar: {_fmt_currency(summary['liquidados_a_pagar'])}"
+                    f"{_fmt_delta(summary.get('liquidados_a_pagar_delta'))}"
+                    f"{_fmt_pct(summary.get('liquidados_a_pagar_pct'))}"
+                )
             if summary.get("pagos") is not None:
-                lines.append(f"      - Pagos: {_fmt_currency(summary['pagos'])}")
+                lines.append(
+                    f"      - Pagos: {_fmt_currency(summary['pagos'])}"
+                    f"{_fmt_delta(summary.get('pagos_delta'))}"
+                    f"{_fmt_pct(summary.get('pagos_pct'))}"
+                )
             if summary.get("pct_pago_sobre_liq") is not None:
-                lines.append(f"      - % pagos s/ (liq a pagar + pagos): {summary['pct_pago_sobre_liq']*100:.1f}%")
+                lines.append(
+                    f"      - % pagos s/ (liq a pagar + pagos): {summary['pct_pago_sobre_liq']*100:.1f}%"
+                )
 
         if summary.get("rap_pagos") is not None or summary.get("rap_a_pagar") is not None:
             lines.append("  • Restos a pagar")
             if summary.get("rap_pagos") is not None:
-                lines.append(f"      - Pagos: {_fmt_currency(summary['rap_pagos'])}")
+                lines.append(
+                    f"      - Pagos: {_fmt_currency(summary['rap_pagos'])}"
+                    f"{_fmt_delta(summary.get('rap_pagos_delta'))}"
+                    f"{_fmt_pct(summary.get('rap_pagos_pct'))}"
+                )
             if summary.get("rap_a_pagar") is not None:
-                lines.append(f"      - A pagar: {_fmt_currency(summary['rap_a_pagar'])}")
+                lines.append(
+                    f"      - A pagar: {_fmt_currency(summary['rap_a_pagar'])}"
+                    f"{_fmt_delta(summary.get('rap_a_pagar_delta'))}"
+                    f"{_fmt_pct(summary.get('rap_a_pagar_pct'))}"
+                )
             if summary.get("pct_rap_pago") is not None:
                 lines.append(f"      - % pagos do total: {summary['pct_rap_pago']*100:.1f}%")
 
         if summary.get("gru_arrecadado") is not None:
-            lines.append(f"  • GRU arrecadado: {_fmt_currency(summary['gru_arrecadado'])}")
+            linha_gru = f"  • GRU arrecadado: {_fmt_currency(summary['gru_arrecadado'])}"
+            if summary.get("gru_arrecadado_delta") is not None:
+                linha_gru += _fmt_delta(summary.get("gru_arrecadado_delta"))
+            if summary.get("gru_arrecadado_pct") is not None:
+                linha_gru += _fmt_pct(summary.get("gru_arrecadado_pct"))
+            if summary.get("gru_media_30d") is not None:
+                media = summary["gru_media_30d"]
+                delta_vs_media = summary["gru_arrecadado"] - media
+                pct_vs_media = (delta_vs_media / media * 100) if media else 0
+                linha_gru += f" ({pct_vs_media:+.1f}% vs. média 30d)"
+            else:
+                linha_gru += " (sem histórico 30d)"
+            lines.append(linha_gru)
     else:
         lines.append("  • Nenhum indicador principal encontrado.")
 

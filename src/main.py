@@ -1,5 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import json
+from pathlib import Path
 import unicodedata
 from src.config_loader import load_settings
 from src.report_index_parser import parse_index
@@ -123,14 +125,88 @@ def main():
         if base_rap:
             summary["pct_rap_pago"] = summary["rap_pagos"] / base_rap
 
+    # Carregar histórico
+    history_path = Path(".cache/history.json")
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    if history_path.exists():
+        try:
+            history = json.loads(history_path.read_text(encoding="utf-8"))
+        except Exception:
+            history = []
+    else:
+        history = []
+
+    # Registrar valores de hoje no histórico
+    record = {"date": today.isoformat()}
+    for key in [
+        "credito_disponivel",
+        "a_liquidar",
+        "liquidados_a_pagar",
+        "pagos",
+        "rap_pagos",
+        "rap_a_pagar",
+        "gru_arrecadado",
+    ]:
+        if summary.get(key) is not None:
+            record[key] = summary[key]
+
+    # Remove entrada do mesmo dia e adiciona a nova
+    history = [h for h in history if h.get("date") != record["date"]]
+    history.append(record)
+    # Mantém só os últimos 90 registros
+    history = history[-90:]
+    history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Funções auxiliares para deltas e médias
+    def last_value(key):
+        for h in reversed(history[:-1]):  # ignora hoje
+            if key in h:
+                return h[key]
+        return None
+
+    def moving_avg(key, days=30):
+        vals = []
+        for h in reversed(history):
+            if key in h:
+                vals.append(h[key])
+            if len(vals) >= days:
+                break
+        if not vals:
+            return None
+        return sum(vals) / len(vals)
+
+    # Deltas vs dia anterior
+    for key in record:
+        if key == "date":
+            continue
+        prev = last_value(key)
+        cur = record[key]
+        if prev is not None:
+            summary[f"{key}_delta"] = cur - prev
+            summary[f"{key}_pct"] = (cur - prev) / prev if prev else None
+
+    # Médias 30d
+    summary["gru_media_30d"] = moving_avg("gru_arrecadado", days=30)
+
     # Mensagem final
     weekday = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"][today.weekday()]
     today_str = today.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
+    summary["gru_media_30d"] = None  # placeholder até termos histórico
+
     msg = format_message(reports, stale, summary, base_url, today_str, time_str, weekday)
-    print(f"[info] Enviando mensagem para Telegram ({len(msg)} chars)", flush=True)
-    resp = send_telegram(cfg["telegram"]["token"], cfg["telegram"]["chat_id"], msg)
-    print(f"[info] Telegram enviado com sucesso: status={resp.status_code} body={resp.text}", flush=True)
+
+    # Envio em blocos para respeitar limite do Telegram (~4096 chars)
+    max_len = 3800
+    parts = []
+    while msg:
+        parts.append(msg[:max_len])
+        msg = msg[max_len:]
+
+    for idx, part in enumerate(parts, 1):
+        print(f"[info] Enviando parte {idx}/{len(parts)} ({len(part)} chars)", flush=True)
+        resp = send_telegram(cfg["telegram"]["token"], cfg["telegram"]["chat_id"], part)
+        print(f"[info] Telegram enviado com sucesso: status={resp.status_code} body={resp.text}", flush=True)
 
 
 if __name__ == "__main__":
