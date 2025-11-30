@@ -28,20 +28,29 @@ def format_message(reports, stale, summary, base_url):
     if summary:
         if summary.get("credito_disponivel") is not None:
             lines.append(f"   - Crédito disponível: {_fmt_currency(summary['credito_disponivel'])}")
-        if summary.get("empenhado") is not None or summary.get("liquidado") is not None or summary.get("pago") is not None:
+        if (
+            summary.get("a_liquidar") is not None
+            or summary.get("liquidados_a_pagar") is not None
+            or summary.get("pagos") is not None
+        ):
             lines.append("   - Saldos de empenhos:")
-            if summary.get("empenhado") is not None:
-                lines.append(f"       • Empenhado: {_fmt_currency(summary['empenhado'])}")
-            if summary.get("liquidado") is not None:
-                lines.append(f"       • Liquidado: {_fmt_currency(summary['liquidado'])}")
-            if summary.get("pago") is not None:
-                lines.append(f"       • Pago: {_fmt_currency(summary['pago'])}")
+            if summary.get("a_liquidar") is not None:
+                lines.append(f"       • A liquidar: {_fmt_currency(summary['a_liquidar'])}")
+            if summary.get("liquidados_a_pagar") is not None:
+                lines.append(f"       • Liquidados a pagar: {_fmt_currency(summary['liquidados_a_pagar'])}")
+            if summary.get("pagos") is not None:
+                lines.append(f"       • Pagos: {_fmt_currency(summary['pagos'])}")
+            if summary.get("pct_pago_sobre_liq") is not None:
+                pct = summary["pct_pago_sobre_liq"] * 100
+                lines.append(f"       • % pagos s/ (liq a pagar + pagos): {pct:.1f}%")
         if summary.get("rap_pagos") is not None or summary.get("rap_a_pagar") is not None:
             lines.append("   - Restos a pagar:")
             if summary.get("rap_pagos") is not None:
                 lines.append(f"       • Pagos: {_fmt_currency(summary['rap_pagos'])}")
             if summary.get("rap_a_pagar") is not None:
                 lines.append(f"       • A pagar: {_fmt_currency(summary['rap_a_pagar'])}")
+            if summary.get("pct_rap_pago") is not None:
+                lines.append(f"       • % pagos do total: {summary['pct_rap_pago']*100:.1f}%")
         if summary.get("gru_arrecadado") is not None:
             lines.append(f"   - GRU arrecadado: {_fmt_currency(summary['gru_arrecadado'])}")
     else:
