@@ -87,10 +87,20 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
                     f"{_fmt_delta(summary.get('pagos_delta'))}"
                     f"{_fmt_pct(summary.get('pagos_pct'))}"
                 )
-            if summary.get("pct_pago_sobre_liq") is not None:
-                lines.append(
-                    f"      - % pagos s/ (liq a pagar + pagos): {summary['pct_pago_sobre_liq']*100:.1f}%"
-                )
+
+        lines.append("")
+        # Percentuais adicionais
+        if summary.get("pct_empenhado_prov") is not None or summary.get("pct_liquidado_empenhado") is not None or summary.get("pct_pago_liquidado") is not None:
+            lines.append("  • Coberturas")
+            if summary.get("pct_empenhado_prov") is not None:
+                lines.append(f"      - Empenhado / Provisionado: {summary['pct_empenhado_prov']*100:.1f}%")
+            if summary.get("pct_liquidado_empenhado") is not None:
+                lines.append(f"      - Liquidado / Empenhado: {summary['pct_liquidado_empenhado']*100:.1f}%")
+            if summary.get("pct_pago_liquidado") is not None:
+                lines.append(f"      - Pago / Liquidado: {summary['pct_pago_liquidado']*100:.1f}%")
+        else:
+            lines.append("  • Nenhum indicador principal encontrado.")
+
         lines.append("")
         if summary.get("rap_pagos") is not None or summary.get("rap_a_pagar") is not None:
             lines.append("  • Restos a pagar")
@@ -125,18 +135,6 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
                 linha_gru += " (sem histórico 30d)"
             lines.append(linha_gru)
         
-        lines.append("")
-        # Percentuais adicionais
-        if summary.get("pct_empenhado_prov") is not None or summary.get("pct_liquidado_empenhado") is not None or summary.get("pct_pago_liquidado") is not None:
-            lines.append("  • Coberturas")
-            if summary.get("pct_empenhado_prov") is not None:
-                lines.append(f"      - Empenhado / Provisionado: {summary['pct_empenhado_prov']*100:.1f}%")
-            if summary.get("pct_liquidado_empenhado") is not None:
-                lines.append(f"      - Liquidado / Empenhado: {summary['pct_liquidado_empenhado']*100:.1f}%")
-            if summary.get("pct_pago_liquidado") is not None:
-                lines.append(f"      - Pago / Liquidado: {summary['pct_pago_liquidado']*100:.1f}%")
-    else:
-        lines.append("  • Nenhum indicador principal encontrado.")
     
     lines.append("")
     # Tendências
