@@ -262,7 +262,7 @@ def main():
     # MÃ©dias 30d
     summary["gru_media_30d"] = moving_avg("gru_arrecadado", days=30)
 
-    # TendÃªncias e maiores variaÃ§Ãµes (Ãºltimo dia vs. anterior / mÃ©dias)
+        # Tendências e maiores variações (último dia vs. anterior / médias)
     trends = []
     movers = []
     keys_trend = [
@@ -277,11 +277,13 @@ def main():
         cur = record.get(key)
         prev = last_value(key)
         avg7 = moving_avg(key, days=7)
-        if cur is None or prev is None or avg7 is None:
+        if cur is None or prev is None:
             continue
         delta_pct = (cur - prev) / prev if prev else None
-        trend_line = f"{label}: {delta_pct*100:+.1f}% vs. dia anterior; {((cur-avg7)/avg7*100):+.1f}% vs. mÃ©dia 7d"
-        trends.append(trend_line)
+        parts = [f"{label}: {delta_pct*100:+.1f}% vs. dia anterior"]
+        if avg7 is not None and avg7 != 0:
+            parts.append(f"{((cur-avg7)/avg7*100):+.1f}% vs. média 7d")
+        trends.append("; ".join(parts))
         movers.append((abs(cur - prev), f"{label}: {cur - prev:+,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")))
 
     trends = trends[:6]
@@ -293,12 +295,12 @@ def main():
     # Top 5 maiores empenhos a liquidar (exercÃ­cio) e RAP a pagar
     if saldos_url:
         try:
-            summary["top5_a_liquidar"] = top5_por_coluna(saldos_url, "a liquidar")
+            summary["top5_a_liquidar"] = top5_empenhos_a_liquidar(saldos_url)
         except Exception as exc:
             print(f"[warn] Falha ao calcular top5 a liquidar: {exc}")
     if rap_url:
         try:
-            summary["top5_rap_a_pagar"] = top5_por_coluna(rap_url, "a pagar")
+            summary["top5_rap_a_pagar"] = top5_rap_a_pagar(rap_url)
         except Exception as exc:
             print(f"[warn] Falha ao calcular top5 rap a pagar: {exc}")
 
@@ -306,8 +308,7 @@ def main():
     weekday = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"][today.weekday()]
     today_str = today.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
-    summary["gru_media_30d"] = None  # placeholder atÃ© termos histÃ³rico
-
+    
     msg = format_message(reports, stale, summary, base_url, today_str, time_str, weekday)
 
     # Envio em blocos para respeitar limite do Telegram (~4096 chars)
@@ -325,3 +326,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
