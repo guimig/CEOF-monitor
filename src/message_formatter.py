@@ -90,7 +90,7 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
                 lines.append(
                     f"      - % pagos s/ (liq a pagar + pagos): {summary['pct_pago_sobre_liq']*100:.1f}%"
                 )
-
+        lines.append("")
         if summary.get("rap_pagos") is not None or summary.get("rap_a_pagar") is not None:
             lines.append("  • Restos a pagar")
             if summary.get("rap_pagos") is not None:
@@ -107,7 +107,8 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
                 )
             if summary.get("pct_rap_pago") is not None:
                 lines.append(f"      - % pagos do total: {summary['pct_rap_pago']*100:.1f}%")
-
+        
+        lines.append("")
         if summary.get("gru_arrecadado") is not None:
             linha_gru = f"  • GRU arrecadado: {_fmt_currency(summary['gru_arrecadado'])}"
             if summary.get("gru_arrecadado_delta") is not None:
@@ -122,7 +123,8 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
             else:
                 linha_gru += " (sem histórico 30d)"
             lines.append(linha_gru)
-
+        
+        lines.append("")
         # Percentuais adicionais
         if summary.get("pct_empenhado_prov") is not None or summary.get("pct_liquidado_empenhado") is not None or summary.get("pct_pago_liquidado") is not None:
             lines.append("  • Coberturas")
@@ -134,7 +136,8 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
                 lines.append(f"      - Pago / Liquidado: {summary['pct_pago_liquidado']*100:.1f}%")
     else:
         lines.append("  • Nenhum indicador principal encontrado.")
-
+    
+    lines.append("")
     # Tendências
     if summary.get("trends"):
         lines.append("")
@@ -142,7 +145,8 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
         lines.append("────────────────────────")
         for tr in summary["trends"]:
             lines.append(f"  • {tr}")
-
+    
+    lines.append("")
     # Maiores variações do dia
     if summary.get("movers"):
         lines.append("")
@@ -151,6 +155,7 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
         for mv in summary["movers"]:
             lines.append(f"  • {mv}")
 
+    #lines.append("")
     # Top 5 listas
     #if summary.get("top5_a_liquidar") or summary.get("top5_rap_a_pagar"):
     #    lines.append("")
