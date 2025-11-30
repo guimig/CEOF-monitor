@@ -23,7 +23,7 @@ def format_message(reports, stale, summary, base_url):
             lines.append(f"   - {title} ({r['date']}, {r['age']} dias)")
         lines.append("")
     else:
-        lines.append("✅ Relatórios atualizados recentemente.")
+        lines.append("✅ Relatórios atualizados.")
         lines.append("")
 
     lines.append("📈 Principais indicadores")
