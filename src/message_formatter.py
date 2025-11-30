@@ -152,17 +152,17 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
             lines.append(f"  • {mv}")
 
     # Top 5 listas
-    if summary.get("top5_a_liquidar") or summary.get("top5_rap_a_pagar"):
-        lines.append("")
-        lines.append("📌 Maiores saldos a liquidar")
-        lines.append("────────────────────────")
-        if summary.get("top5_a_liquidar"):
-            lines.append("  • Exercício atual:")
-            for item in summary["top5_a_liquidar"]:
-                lines.append(f"      - {item}")
-        if summary.get("top5_rap_a_pagar"):
-            lines.append("  • Restos a pagar:")
-            for item in summary["top5_rap_a_pagar"]:
-                lines.append(f"      - {item}")
+    #if summary.get("top5_a_liquidar") or summary.get("top5_rap_a_pagar"):
+    #    lines.append("")
+    #    lines.append("📌 Maiores saldos a liquidar")
+    #    lines.append("────────────────────────")
+    #    if summary.get("top5_a_liquidar"):
+    #        lines.append("  • Exercício atual:")
+    #        for item in summary["top5_a_liquidar"]:
+    #            lines.append(f"      - {item}")
+    #    if summary.get("top5_rap_a_pagar"):
+    #        lines.append("  • Restos a pagar:")
+    #        for item in summary["top5_rap_a_pagar"]:
+    #            lines.append(f"      - {item}")
 
     return "\n".join(lines)
