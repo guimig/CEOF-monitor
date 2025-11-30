@@ -13,6 +13,14 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
 
+      - name: Restaurar histórico
+        uses: actions/cache@v4
+        with:
+          path: .cache/history.json
+          key: history-${{ runner.os }}-${{ github.run_number }}
+          restore-keys: |
+            history-${{ runner.os }}-
+
       - name: Instalar Python
         uses: actions/setup-python@v5
         with:
