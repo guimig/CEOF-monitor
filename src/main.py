@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
 from pathlib import Path
@@ -62,7 +62,7 @@ def main():
         if age > max_age:
             rep["age"] = age
             stale.append(rep)
-    # Remove do controle de desatualizados o relatório anual de 2024 (não precisa ser diário)
+    # Remove do controle de desatualizados o relatÃ³rio anual de 2024 (nÃ£o precisa ser diÃ¡rio)
     stale = [
         r for r in stale
         if "despesas empenhadas, liquidadas e pagas - 2024" not in _norm(r["title"])
@@ -83,7 +83,7 @@ def main():
         except Exception as exc:
             print(f"[error] Falha ao extrair total de {rep['url']}: {exc}", flush=True)
 
-    # Resumo dos principais indicadores (com filtros específicos por título/coluna)
+    # Resumo dos principais indicadores (com filtros especÃ­ficos por tÃ­tulo/coluna)
     summary = {
         "credito_disponivel": _pick_value(
             indicators,
@@ -121,7 +121,7 @@ def main():
             lambda c: "arrecad" in c or "liquida" in c,
         ),
     }
-    # Derivar porcentagens básicas
+    # Derivar porcentagens bÃ¡sicas
     if summary.get("liquidados_a_pagar") is not None and summary.get("pagos") is not None:
         base_liq = summary["liquidados_a_pagar"] + summary["pagos"]
         if base_liq:
@@ -131,19 +131,19 @@ def main():
         if base_rap:
             summary["pct_rap_pago"] = summary["rap_pagos"] / base_rap
 
-    # Descobrir URLs específicos a partir dos relatórios
+    # Descobrir URLs especÃ­ficos a partir dos relatÃ³rios
     def find_url(title_substr):
         for r in reports:
             if title_substr.lower() in _norm(r["title"]):
                 return r["url"]
         return None
 
-    cred_url = find_url("crédito disponível")
+    cred_url = find_url("crÃ©dito disponÃ­vel")
     prov_url = find_url("provisionamentos")
-    saldos_url = find_url("saldos de empenhos do exercício - conta contábil")
+    saldos_url = find_url("saldos de empenhos do exercÃ­cio - conta contÃ¡bil")
     rap_url = find_url("restos a pagar (rap)")
 
-    # Créditos disponíveis por grupo (investimentos vs ODC)
+    # CrÃ©ditos disponÃ­veis por grupo (investimentos vs ODC)
     if cred_url:
         try:
             cred_groups = creditos_por_grupo(cred_url)
@@ -199,7 +199,7 @@ def main():
         summary["pct_pago_liquidado"] = (
             summary["pago_total"] / summary["liquidado_total"] if summary["liquidado_total"] else None
         )
-    # Carregar histórico
+    # Carregar histÃ³rico
     history_path = Path(".cache/history.json")
     history_path.parent.mkdir(parents=True, exist_ok=True)
     if history_path.exists():
@@ -210,7 +210,7 @@ def main():
     else:
         history = []
 
-    # Registrar valores de hoje no histórico
+    # Registrar valores de hoje no histÃ³rico
     record = {"date": today.isoformat()}
     for key in [
         "credito_disponivel",
@@ -227,11 +227,11 @@ def main():
     # Remove entrada do mesmo dia e adiciona a nova
     history = [h for h in history if h.get("date") != record["date"]]
     history.append(record)
-    # Mantém só os últimos 90 registros
+    # MantÃ©m sÃ³ os Ãºltimos 90 registros
     history = history[-90:]
     history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # Funções auxiliares para deltas e médias
+    # FunÃ§Ãµes auxiliares para deltas e mÃ©dias
     def last_value(key):
         for h in reversed(history[:-1]):  # ignora hoje
             if key in h:
@@ -259,10 +259,11 @@ def main():
             summary[f"{key}_delta"] = cur - prev
             summary[f"{key}_pct"] = (cur - prev) / prev if prev else None
 
-    # Médias 30d
+    # MÃ©dias 30d
+    # Medias 30d
     summary["gru_media_30d"] = moving_avg("gru_arrecadado", days=30)
 
-        # Tend�ncias e maiores varia��es (�ltimo dia vs. anterior / m�dias)
+    # Tendencias e maiores variacoes (ultimo dia vs. anterior / medias)
     trends = []
     movers = []
     keys_trend = [
@@ -282,7 +283,7 @@ def main():
         delta_pct = (cur - prev) / prev if prev else None
         parts = [f"{label}: {delta_pct*100:+.1f}% vs. dia anterior"]
         if avg7 is not None and avg7 != 0:
-            parts.append(f"{((cur-avg7)/avg7*100):+.1f}% vs. m�dia 7d")
+            parts.append(f"{((cur-avg7)/avg7*100):+.1f}% vs. media 7d")
         trends.append("; ".join(parts))
         movers.append((abs(cur - prev), f"{label}: {cur - prev:+,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")))
 
@@ -290,9 +291,7 @@ def main():
     movers = sorted(movers, key=lambda x: x[0], reverse=True)[:3]
 
     summary["trends"] = trends
-    summary["movers"] = [m[1] for m in movers]
-
-    # Top 5 maiores empenhos a liquidar (exercício) e RAP a pagar
+    summary["movers"] = [m[1] for m in movers]# Top 5 maiores empenhos a liquidar (exercÃ­cio) e RAP a pagar
     if saldos_url:
         try:
             summary["top5_a_liquidar"] = top5_empenhos_a_liquidar(saldos_url)
@@ -326,6 +325,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
 
 
 
