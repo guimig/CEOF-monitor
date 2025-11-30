@@ -62,6 +62,7 @@ def format_message(reports, stale, summary, base_url, today_str, time_str, weekd
                 if parts:
                     lines.append("      - " + "; ".join(parts))
 
+        lines.append("")
         if (
             summary.get("a_liquidar") is not None
             or summary.get("liquidados_a_pagar") is not None
