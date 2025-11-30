@@ -16,10 +16,13 @@ def creditos_por_grupo(url):
     invest = 0.0
     odc = 0.0
     for cells in rows:
-        label = " ".join(cells).lower()
-        if not any(ch.isdigit() for ch in label) and "total" in label:
+        if not cells:
+            continue
+        label0 = cells[0].upper()
+        if "TOTAL" in label0:
             continue
         val = None
+        # usa o último número da linha (Saldo - R$)
         for cell in reversed(cells):
             v = parse_br_number(cell)
             if v is not None:
@@ -27,9 +30,9 @@ def creditos_por_grupo(url):
                 break
         if val is None:
             continue
-        if "investiment" in label:
+        if "INVEST" in label0:
             invest += val
-        elif "outras despesas correntes" in label:
+        elif "OUTRAS DESPESAS CORRENTES" in label0:
             odc += val
     total = invest + odc
     return {"investimentos": invest, "odc": odc, "total": total}
@@ -43,6 +46,8 @@ def provisionamentos_por_grupo(url):
         if not cells:
             continue
         gd = cells[0].strip()
+        if "TOTAL" in gd.upper():
+            continue
         val = None
         for cell in reversed(cells):
             v = parse_br_number(cell)
