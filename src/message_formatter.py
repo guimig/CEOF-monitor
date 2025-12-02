@@ -25,7 +25,7 @@ def _fmt_pct(pct: float) -> str:
 def format_message(reports, stale, summary, base_url, today_str, time_str, weekday):
     lines = []
     lines.append("📊 CEOF - Monitoramento Automático")
-    lines.append(f"🌐 Home: {base_url}")
+    lines.append(f"🌐 Home: https://bit.ly/dap-araquari")
     lines.append(f"🕒 Hoje é {today_str} {time_str} ({weekday})")
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━")
 
