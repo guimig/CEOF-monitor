@@ -1,202 +1,94 @@
+import re
+import unicodedata
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import json
-from pathlib import Path
-import unicodedata
+
 from src.config_loader import load_settings
 from src.report_index_parser import parse_index
-from src.report_total_extractor import extract_last_total
 from src.message_formatter import format_message
 from src.telegram_client import send_telegram
 
 
 def _norm(text: str) -> str:
     return "".join(
-        ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)
+        ch for ch in unicodedata.normalize("NFKD", text or "") if not unicodedata.combining(ch)
     ).lower()
 
 
-def _pick_value(indicators, title_pred, col_pred):
-    for title, info in indicators.items():
-        title_norm = _norm(title)
-        if not title_pred(title_norm):
+def _matches_any(title: str, patterns):
+    title_norm = _norm(title)
+    return any(_norm(pattern) in title_norm for pattern in patterns or [])
+
+
+def _has_previous_year(title: str, current_year: int):
+    years = [int(year) for year in re.findall(r"\b(20\d{2})\b", title or "")]
+    return any(year < current_year for year in years)
+
+
+def _allowed_age_days(report, today, cfg):
+    rules = cfg.get("stale_rules") or {}
+    title = report.get("title", "")
+
+    if _matches_any(title, rules.get("ignore_title_patterns")):
+        return None
+
+    if rules.get("previous_years") == "ignore" and _has_previous_year(title, today.year):
+        return None
+
+    if _matches_any(title, rules.get("monthly_title_patterns")):
+        return int(rules.get("monthly_max_report_age_days", 35))
+
+    return int(cfg.get("max_report_age_days", 1))
+
+
+def _find_stale_reports(reports, today, cfg):
+    stale = []
+    for report in reports:
+        allowed_age = _allowed_age_days(report, today, cfg)
+        if allowed_age is None:
             continue
-        vals = info.get("values") or []
-        for item in reversed(vals):
-            if isinstance(item, dict):
-                col_norm = _norm(item.get("col", ""))
-                if col_pred(col_norm):
-                    return item.get("value")
-            else:
-                if col_pred(""):
-                    return item
-    return None
+
+        age = (today - report["date"]).days
+        if age > allowed_age:
+            stale.append({**report, "age": age, "allowed_age": allowed_age})
+    return stale
 
 
 def main():
     cfg = load_settings()
+    tz = ZoneInfo("America/Sao_Paulo")
+    now = datetime.now(tz)
+    today = now.date()
+
+    if today.weekday() == 6:
+        print("[info] Domingo: envio de mensagem desativado.", flush=True)
+        return
 
     base_url = cfg["base_url"]
-    max_age = cfg["max_report_age_days"]
-
-    print(f"[info] Iniciando monitor. base_url={base_url} max_age={max_age}", flush=True)
+    print(f"[info] Iniciando monitor. base_url={base_url}", flush=True)
 
     reports = parse_index(base_url)
     print(f"[info] Relatorios encontrados no indice: {len(reports)}", flush=True)
     if not reports:
         raise RuntimeError("Nenhum relatorio encontrado no indice; verifique base_url/HTML.")
 
-    # Verificar desatualizados
-    stale = []
-    tz = ZoneInfo("America/Sao_Paulo")
-    now = datetime.now(tz)
-    today = now.date()
-    for rep in reports:
-        age = (today - rep["date"]).days
-        if age > max_age:
-            rep["age"] = age
-            stale.append(rep)
-    # Remove do controle de desatualizados o relatório anual de 2024 (não precisa ser diário)
-    stale = [
-        r for r in stale
-        if "despesas empenhadas, liquidadas e pagas - 2024" not in _norm(r["title"])
-    ]
+    stale = _find_stale_reports(reports, today, cfg)
     print(f"[info] Relatorios desatualizados: {len(stale)}", flush=True)
 
-    # Indicadores
-    indicators = {}
-    for rep in reports:
-        print(f"[info] Extraindo indicador de {rep['url']}", flush=True)
-        try:
-            total = extract_last_total(rep["url"])
-            if total and total.get("values"):
-                indicators[rep["title"]] = total
-                print(f"[info] Indicador extraido: {rep['title']} -> {total['values']}", flush=True)
-            else:
-                print(f"[warn] Nenhum 'Total' util encontrado em {rep['url']}", flush=True)
-        except Exception as exc:
-            print(f"[error] Falha ao extrair total de {rep['url']}: {exc}", flush=True)
-
-    # Resumo dos principais indicadores (com filtros específicos por título/coluna)
-    summary = {
-        "credito_disponivel": _pick_value(
-            indicators,
-            lambda t: "credito disponivel" in t,
-            lambda c: True,
-        ),
-        "a_liquidar": _pick_value(
-            indicators,
-            lambda t: "saldos de empenhos do exercicio - conta contabil" in t,
-            lambda c: "a liquidar" in c,
-        ),
-        "liquidados_a_pagar": _pick_value(
-            indicators,
-            lambda t: "saldos de empenhos do exercicio - conta contabil" in t,
-            lambda c: "liquidados a pagar" in c,
-        ),
-        "pagos": _pick_value(
-            indicators,
-            lambda t: "saldos de empenhos do exercicio - conta contabil" in t,
-            lambda c: "pagos" in c,
-        ),
-        "rap_pagos": _pick_value(
-            indicators,
-            lambda t: "restos a pagar (rap)" in t,
-            lambda c: "pagos" in c,
-        ),
-        "rap_a_pagar": _pick_value(
-            indicators,
-            lambda t: "restos a pagar (rap)" in t,
-            lambda c: "a pagar" in c,
-        ),
-        "gru_arrecadado": _pick_value(
-            indicators,
-            lambda t: "recolhimento" in t and "gru" in t,
-            lambda c: "arrecad" in c or "liquida" in c,
-        ),
-    }
-    # Derivar porcentagens básicas
-    if summary.get("liquidados_a_pagar") is not None and summary.get("pagos") is not None:
-        base_liq = summary["liquidados_a_pagar"] + summary["pagos"]
-        if base_liq:
-            summary["pct_pago_sobre_liq"] = summary["pagos"] / base_liq
-    if summary.get("rap_a_pagar") is not None and summary.get("rap_pagos") is not None:
-        base_rap = summary["rap_a_pagar"] + summary["rap_pagos"]
-        if base_rap:
-            summary["pct_rap_pago"] = summary["rap_pagos"] / base_rap
-
-    # Carregar histórico
-    history_path = Path(".cache/history.json")
-    history_path.parent.mkdir(parents=True, exist_ok=True)
-    if history_path.exists():
-        try:
-            history = json.loads(history_path.read_text(encoding="utf-8"))
-        except Exception:
-            history = []
-    else:
-        history = []
-
-    # Registrar valores de hoje no histórico
-    record = {"date": today.isoformat()}
-    for key in [
-        "credito_disponivel",
-        "a_liquidar",
-        "liquidados_a_pagar",
-        "pagos",
-        "rap_pagos",
-        "rap_a_pagar",
-        "gru_arrecadado",
-    ]:
-        if summary.get(key) is not None:
-            record[key] = summary[key]
-
-    # Remove entrada do mesmo dia e adiciona a nova
-    history = [h for h in history if h.get("date") != record["date"]]
-    history.append(record)
-    # Mantém só os últimos 90 registros
-    history = history[-90:]
-    history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    # Funções auxiliares para deltas e médias
-    def last_value(key):
-        for h in reversed(history[:-1]):  # ignora hoje
-            if key in h:
-                return h[key]
-        return None
-
-    def moving_avg(key, days=30):
-        vals = []
-        for h in reversed(history):
-            if key in h:
-                vals.append(h[key])
-            if len(vals) >= days:
-                break
-        if not vals:
-            return None
-        return sum(vals) / len(vals)
-
-    # Deltas vs dia anterior
-    for key in record:
-        if key == "date":
-            continue
-        prev = last_value(key)
-        cur = record[key]
-        if prev is not None:
-            summary[f"{key}_delta"] = cur - prev
-            summary[f"{key}_pct"] = (cur - prev) / prev if prev else None
-
-    # Médias 30d
-    summary["gru_media_30d"] = moving_avg("gru_arrecadado", days=30)
-
-    # Mensagem final
     weekday = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"][today.weekday()]
     today_str = today.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
-    summary["gru_media_30d"] = None  # placeholder até termos histórico
 
-    msg = format_message(reports, stale, summary, base_url, today_str, time_str, weekday)
+    msg = format_message(
+        reports=reports,
+        stale=stale,
+        base_url=base_url,
+        portal_url=cfg.get("portal_url"),
+        today_str=today_str,
+        time_str=time_str,
+        weekday=weekday,
+    )
 
-    # Envio em blocos para respeitar limite do Telegram (~4096 chars)
     max_len = 3800
     parts = []
     while msg:
