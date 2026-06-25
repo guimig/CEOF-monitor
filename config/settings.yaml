@@ -1,6 +1,17 @@
 base_url: "https://guimig.github.io/EmailBackupHub/"
 home_url: "https://bit.ly/dap-araquari"
+portal_url: "https://portal-dap.araquari.ifc.edu.br/"
 max_report_age_days: 1
+
+stale_rules:
+  previous_years: "ignore"
+  monthly_max_report_age_days: 35
+  monthly_title_patterns:
+    - "mensal"
+    - "mes"
+    - "mês"
+  ignore_title_patterns:
+    - "despesas empenhadas, liquidadas e pagas - 2024"
 
 telegram:
   token_env: "TELEGRAM_TOKEN"
