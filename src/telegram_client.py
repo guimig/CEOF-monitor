@@ -6,6 +6,7 @@ def send_telegram(token: str, chat_id: str, text: str):
     payload = {
         "chat_id": chat_id,
         "text": text,
+        "disable_web_page_preview": True,
     }
 
     resp = requests.post(url, data=payload, timeout=(5, 20))
