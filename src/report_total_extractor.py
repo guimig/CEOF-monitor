@@ -1,5 +1,6 @@
 import re
 import unicodedata
+import requests
 from src.utils import get_soup, parse_br_number
 
 
@@ -13,6 +14,74 @@ def _extract_values_from_text(text: str):
     nums = re.findall(r"[\(\)\d\.\,]+", text)
     values = [parse_br_number(n) for n in nums if parse_br_number(n) is not None]
     return values
+
+
+def _is_header_row(row):
+    first_value = next(iter(row.values()), "")
+    return "natureza despesa" in _normalize(str(first_value))
+
+
+def _json_headers(rows):
+    headers = {}
+    header_rows = []
+    for row in rows[:10]:
+        if not _is_header_row(row):
+            break
+        header_rows.append(row)
+
+    for row in header_rows:
+        for col, value in row.items():
+            text = str(value or "").strip()
+            if not text:
+                continue
+            if parse_br_number(text) is not None:
+                continue
+            headers.setdefault(col, [])
+            if text not in headers[col]:
+                headers[col].append(text)
+
+    return {col: " | ".join(parts) for col, parts in headers.items()}, len(header_rows)
+
+
+def extract_last_total_from_json(url: str):
+    resp = requests.get(url, timeout=(5, 20))
+    resp.raise_for_status()
+    payload = resp.json()
+    rows = payload.get("rows") or []
+    if not rows:
+        return None
+
+    headers, header_count = _json_headers(rows)
+    totals = {}
+    for row in rows[header_count:]:
+        for col, value in row.items():
+            val = parse_br_number(str(value or ""))
+            if val is None:
+                continue
+            totals[col] = totals.get(col, 0.0) + val
+
+    financial_terms = ("saldo", "valor", "arrecad", "liquid", "pago", "empenh", "restos")
+    values = []
+    for col, value in totals.items():
+        header = headers.get(col)
+        if not header:
+            continue
+        if not any(term in _normalize(header) for term in financial_terms):
+            continue
+        values.append(
+            {
+                "col": header,
+                "value": value,
+                "raw_cell": str(value),
+            }
+        )
+    if not values:
+        return None
+
+    return {
+        "raw": f"Somatorio calculado do JSON: {payload.get('title') or url}",
+        "values": values,
+    }
 
 
 def _build_table_grid(table):

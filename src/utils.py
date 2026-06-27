@@ -14,6 +14,15 @@ def parse_br_number(text: str):
         negative = True
         text = text[1:-1]
 
+    text = re.sub(r"(?i)\br\$\s*", "", text)
+    text = text.replace(" ", "")
+    if re.search(r"[A-Za-zÀ-ÿ]", text):
+        return None
+
+    text = re.sub(r"[^\d,.\-]", "", text)
+    if not text:
+        return None
+
     text = text.replace(".", "").replace(",", ".")
     try:
         value = float(text)

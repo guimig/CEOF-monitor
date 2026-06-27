@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from src.config_loader import load_settings
 from src.report_index_parser import parse_index
-from src.report_total_extractor import extract_last_total
+from src.report_total_extractor import extract_last_total, extract_last_total_from_json
 from src.message_formatter import format_message
 from src.telegram_client import send_telegram
 
@@ -47,6 +47,16 @@ def _allowed_age_days(report, today, cfg):
 def _find_stale_reports(reports, today, cfg):
     stale = []
     for report in reports:
+        metadata = report.get("metadata") or {}
+        if "status" in metadata and "limite_dias" in metadata:
+            if metadata.get("limite_dias") is None:
+                continue
+            age = int(metadata.get("idade_dias", (today - report["date"]).days))
+            allowed_age = int(metadata["limite_dias"])
+            if metadata.get("status") == "desatualizado" or age > allowed_age:
+                stale.append({**report, "age": age, "allowed_age": allowed_age})
+            continue
+
         allowed_age = _allowed_age_days(report, today, cfg)
         if allowed_age is None:
             continue
@@ -79,7 +89,14 @@ def _extract_indicators(reports):
     for report in reports:
         print(f"[info] Extraindo indicador de {report['url']}", flush=True)
         try:
-            total = extract_last_total(report["url"])
+            total = None
+            if report.get("json_url"):
+                try:
+                    total = extract_last_total_from_json(report["json_url"])
+                except Exception as exc:
+                    print(f"[warn] Falha ao extrair JSON de {report['json_url']}: {exc}", flush=True)
+            if not total:
+                total = extract_last_total(report["url"])
             if total and total.get("values"):
                 indicators[report["title"]] = total
                 print(f"[info] Indicador extraido: {report['title']} -> {total['values']}", flush=True)
@@ -99,28 +116,28 @@ def _build_summary(indicators, today):
         ),
         "a_liquidar": _pick_value(
             indicators,
-            lambda title: "saldos de empenhos do exercicio - conta contabil" in title,
+            lambda title: "saldos de empenhos do exercicio" in title and "conta contabil" in title,
             lambda col: "a liquidar" in col,
         ),
         "liquidados_a_pagar": _pick_value(
             indicators,
-            lambda title: "saldos de empenhos do exercicio - conta contabil" in title,
+            lambda title: "saldos de empenhos do exercicio" in title and "conta contabil" in title,
             lambda col: "liquidados a pagar" in col,
         ),
         "pagos": _pick_value(
             indicators,
-            lambda title: "saldos de empenhos do exercicio - conta contabil" in title,
+            lambda title: "saldos de empenhos do exercicio" in title and "conta contabil" in title,
             lambda col: "pagos" in col,
         ),
         "rap_pagos": _pick_value(
             indicators,
-            lambda title: "restos a pagar (rap)" in title,
-            lambda col: "pagos" in col,
+            lambda title: "restos a pagar" in title and "rap" in title,
+            lambda col: "restos a pagar pagos" in col,
         ),
         "rap_a_pagar": _pick_value(
             indicators,
-            lambda title: "restos a pagar (rap)" in title,
-            lambda col: "a pagar" in col,
+            lambda title: "restos a pagar" in title and "rap" in title,
+            lambda col: "restos a pagar a pagar" in col,
         ),
         "gru_arrecadado": _pick_value(
             indicators,
